@@ -83,9 +83,34 @@ bool myMesh::readFile(std::string filename)
 		else if (t == "s") {}
 		else if (t == "f")
 		{
-			cout << "f"; 
-			while (myline >> u) cout << " " << atoi((u.substr(0, u.find("/"))).c_str());
-			cout << endl;
+			faceids.clear();
+			while (myline >> u) // read indices of vertices from a face into a container - it helps to access them later 
+				faceids.push_back(atoi((u.substr(0, u.find("/"))).c_str()) - 1);
+			if (faceids.size() < 3) // ignore degenerate faces
+				continue;
+
+			hedges = new myHalfedge * [faceids.size()]; // allocate the array for storing pointers to half-edges
+			for (unsigned int i = 0; i < faceids.size(); i++)
+				hedges[i] = new myHalfedge(); // pre-allocate new half-edges
+
+			myFace* f = new myFace(); // allocate the new face
+			f->adjacent_halfedge = hedges[0]; // connect the face with incident edge
+			for (unsigned int i = 0; i < faceids.size(); i++)
+			{
+				int iplusone = (i + 1) % faceids.size();
+				int iminusone = (i - 1 + faceids.size()) % faceids.size();
+
+				// YOUR CODE COMES HERE!
+
+				// connect prevs, and next
+
+				// search for the twins using twin_map
+
+				// set originof
+				// push edges to halfedges in myMesh
+			}
+			delete[] hedges;
+			// push faces to faces in myMesh
 		}
 	}
 
