@@ -1,0 +1,69 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.opendb
+
+# Build folders
+Debug/
+Release/
+x64/Debug/
+x64/Release/
+build/
+bin/
+obj/
+
+# Visual C++ intermediate files
+ipch/
+*.pch
+*.pdb
+*.idb
+*.lib
+*.obj
+*.o
+
+# Executables and libraries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+
+# Logs and temporary
+*.log
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc
+*.zip
+*.7z
+*.tar.gz
+
+# Ignore local IDE/project files
+*.suo
+*.user
+*.userprefs
+
+# Ignore extensions and package managers
+.vscode/
+node_modules/
+
+# Ignore SSH keys and secrets
+*.pem
+*.key
+
+# Keep this file tracked
+!.gitignore
