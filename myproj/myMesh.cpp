@@ -71,6 +71,12 @@ bool myMesh::readFile(std::string filename)
 			float x, y, z;
 			myline >> x >> y >> z;
 			cout << "v " << x << " " << y << " " << z << endl;
+
+			myPoint3D* p = new myPoint3D(x, y, z);
+			myVertex* v = new myVertex();
+			v->point = p;
+			vertices.push_back(v);
+			
 		}
 		else if (t == "mtllib") {}
 		else if (t == "usemtl") {}
