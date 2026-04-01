@@ -100,17 +100,22 @@ bool myMesh::readFile(std::string filename)
 				int iplusone = (i + 1) % faceids.size();
 				int iminusone = (i - 1 + faceids.size()) % faceids.size();
 
-				// YOUR CODE COMES HERE!
-
 				// connect prevs, and next
+				hedges[i]->next = hedges[iplusone];
+				hedges[i]->prev = hedges[iminusone];
 
-				// search for the twins using twin_map
+				// connect halfedge to face
+				hedges[i]->adjacent_face = f;
 
-				// set originof
+				// set source (vertex origin) of halfedge
+				hedges[i]->source = vertices[faceids[i]];
+
 				// push edges to halfedges in myMesh
+				halfedges.push_back(hedges[i]);
 			}
 			delete[] hedges;
 			// push faces to faces in myMesh
+			faces.push_back(f);
 		}
 	}
 
