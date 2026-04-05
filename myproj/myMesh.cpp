@@ -70,13 +70,11 @@ bool myMesh::readFile(std::string filename)
 		{
 			float x, y, z;
 			myline >> x >> y >> z;
-			cout << "v " << x << " " << y << " " << z << endl;
 
 			myPoint3D* p = new myPoint3D(x, y, z);
 			myVertex* v = new myVertex();
 			v->point = p;
 			vertices.push_back(v);
-			
 		}
 		else if (t == "mtllib") {}
 		else if (t == "usemtl") {}
@@ -110,6 +108,24 @@ bool myMesh::readFile(std::string filename)
 				// set source (vertex origin) of halfedge
 				hedges[i]->source = vertices[faceids[i]];
 
+				// set originof for vertex if not already set
+				if (vertices[faceids[i]]->originof == NULL)
+					vertices[faceids[i]]->originof = hedges[i];
+
+				// search for the twins using twin_map
+				pair<int,int> rev_key = make_pair(faceids[iplusone], faceids[i]);
+				it = twin_map.find(rev_key);
+				if (it != twin_map.end())
+				{
+					hedges[i]->twin = it->second;
+					it->second->twin = hedges[i];
+				}
+				else
+				{
+					pair<int,int> key = make_pair(faceids[i], faceids[iplusone]);
+					twin_map[key] = hedges[i];
+				}
+
 				// push edges to halfedges in myMesh
 				halfedges.push_back(hedges[i]);
 			}
@@ -128,7 +144,11 @@ bool myMesh::readFile(std::string filename)
 
 void myMesh::computeNormals()
 {
-	/**** TODO ****/
+	for (unsigned int i = 0; i < faces.size(); i++)
+		faces[i]->computeNormal();
+
+	for (unsigned int i = 0; i < vertices.size(); i++)
+		vertices[i]->computeNormal();
 }
 
 void myMesh::normalize()

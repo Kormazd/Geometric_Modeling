@@ -17,5 +17,15 @@ myVertex::~myVertex(void)
 
 void myVertex::computeNormal()
 {
-	/**** TODO ****/
+	normal->dX = 0.0;
+	normal->dY = 0.0;
+	normal->dZ = 0.0;
+
+	myHalfedge *e = originof;
+	do {
+		*normal = *normal + *(e->adjacent_face->normal);
+		e = e->twin->next;
+	} while (e != originof);
+
+	normal->normalize();
 }
