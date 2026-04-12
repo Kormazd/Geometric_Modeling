@@ -24,6 +24,7 @@ void myVertex::computeNormal()
 	myHalfedge *e = originof;
 	do {
 		*normal = *normal + *(e->adjacent_face->normal);
+		if (e->twin == NULL) break;
 		e = e->twin->next;
 	} while (e != originof);
 

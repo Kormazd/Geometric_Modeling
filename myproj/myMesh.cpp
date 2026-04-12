@@ -92,7 +92,7 @@ bool myMesh::readFile(std::string filename)
 			for (unsigned int i = 0; i < faceids.size(); i++)
 				hedges_vec.push_back(new myHalfedge());
 
-			myFace* f = new myFace();
+			myFace *f = new myFace();
 			f->adjacent_halfedge = hedges_vec[0];
 
 			for (unsigned int i = 0; i < faceids.size(); i++)
@@ -209,12 +209,9 @@ void myMesh::triangulate()
 {
 	vector<myFace *> faces_copy = faces;
 	for (unsigned int i = 0; i < faces_copy.size(); i++)
-	{
 		triangulate(faces_copy[i]);
-	}
 }
 
-//return false if already triangle, true othewise.
 bool myMesh::triangulate(myFace *f)
 {
 	myHalfedge *e = f->adjacent_halfedge;
@@ -263,7 +260,6 @@ bool myMesh::triangulate(myFace *f)
 
 		tri->adjacent_halfedge = he1;
 		tri->index = faces.size();
-		tri->computeNormal();
 		faces.push_back(tri);
 
 		v1 = v1->next;
