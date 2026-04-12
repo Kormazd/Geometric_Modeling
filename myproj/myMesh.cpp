@@ -235,61 +235,6 @@ bool myMesh::triangulate(myFace *f)
 	if (n == 3)
 		return false;
 
-	myPoint3D center(0, 0, 0);
-	e = f->adjacent_halfedge;
-	do {
-		center.X += e->source->point->X;
-		center.Y += e->source->point->Y;
-		center.Z += e->source->point->Z;
-		e = e->next;
-	} while (e != f->adjacent_halfedge);
-
-	center.X /= n;
-	center.Y /= n;
-	center.Z /= n;
-
-	myVertex *center_vertex = new myVertex();
-	center_vertex->point = new myPoint3D(center.X, center.Y, center.Z);
-	vertices.push_back(center_vertex);
-
-	e = f->adjacent_halfedge;
-	for (int i = 0; i < n; i++)
-	{
-		myFace *new_face = new myFace();
-
-		myHalfedge *he1 = new myHalfedge();
-		myHalfedge *he2 = new myHalfedge();
-		myHalfedge *he3 = new myHalfedge();
-
-		he1->source = e->source;
-		he2->source = e->next->source;
-		he3->source = center_vertex;
-
-		he1->adjacent_face = new_face;
-		he2->adjacent_face = new_face;
-		he3->adjacent_face = new_face;
-
-		he1->next = he2;
-		he2->next = he3;
-		he3->next = he1;
-
-		he1->prev = he3;
-		he2->prev = he1;
-		he3->prev = he2;
-
-		halfedges.push_back(he1);
-		halfedges.push_back(he2);
-		halfedges.push_back(he3);
-
-		new_face->adjacent_halfedge = he1;
-		faces.push_back(new_face);
-
-		e = e->next;
-	}
-
-	faces.erase(find(faces.begin(), faces.end(), f));
-	delete f;
-
 	return true;
 }
 
