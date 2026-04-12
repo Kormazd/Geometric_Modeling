@@ -253,13 +253,12 @@ void display()
 		vector <GLuint> silhouette_edges;
 		for (vector<myHalfedge *>::iterator it = m->halfedges.begin(); it != m->halfedges.end(); it++)
 		{
-			/**** TODO: WRITE CODE TO COMPUTE SILHOUETTE ****/
 			myHalfedge *e = (*it);
 			myVertex *v1 = (*it)->source;
 			if ((*it)->twin == NULL) continue;
 			myVertex *v2 = (*it)->twin->source;
 
-			if ( 0 /*ADD THE CONDITION TO CHECK IF THE HALFEDGE DEFINED BY (V1, V2) IS A SILHOUETTE EDGE*/ )
+			if ((*(e->adjacent_face->normal) * camera_forward > 0) != (*(e->twin->adjacent_face->normal) * camera_forward > 0))
 			{
 				silhouette_edges.push_back(v1->index);
 				silhouette_edges.push_back(v2->index);
