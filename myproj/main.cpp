@@ -46,7 +46,6 @@ void menu(int item)
 	case MENU_TRIANGULATE:
 		{
 			m->triangulate();
-			m->computeNormals();
 			makeBuffers(m);
 			break;
 		}

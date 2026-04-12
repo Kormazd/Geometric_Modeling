@@ -83,56 +83,48 @@ bool myMesh::readFile(std::string filename)
 		else if (t == "f")
 		{
 			faceids.clear();
-			while (myline >> u) // read indices of vertices from a face into a container - it helps to access them later 
+			while (myline >> u)
 				faceids.push_back(atoi((u.substr(0, u.find("/"))).c_str()) - 1);
-			if (faceids.size() < 3) // ignore degenerate faces
+			if (faceids.size() < 3)
 				continue;
 
-			hedges = new myHalfedge * [faceids.size()]; // allocate the array for storing pointers to half-edges
+			vector<myHalfedge*> hedges_vec;
 			for (unsigned int i = 0; i < faceids.size(); i++)
-				hedges[i] = new myHalfedge(); // pre-allocate new half-edges
+				hedges_vec.push_back(new myHalfedge());
 
-			myFace* f = new myFace(); // allocate the new face
-			f->adjacent_halfedge = hedges[0]; // connect the face with incident edge
+			myFace* f = new myFace();
+			f->adjacent_halfedge = hedges_vec[0];
+
 			for (unsigned int i = 0; i < faceids.size(); i++)
 			{
 				int iplusone = (i + 1) % faceids.size();
 				int iminusone = (i - 1 + faceids.size()) % faceids.size();
 
-				// connect prevs, and next
-				hedges[i]->next = hedges[iplusone];
-				hedges[i]->prev = hedges[iminusone];
+				hedges_vec[i]->next = hedges_vec[iplusone];
+				hedges_vec[i]->prev = hedges_vec[iminusone];
+				hedges_vec[i]->adjacent_face = f;
+				hedges_vec[i]->source = vertices[faceids[i]];
 
-				// connect halfedge to face
-				hedges[i]->adjacent_face = f;
-
-				// set source (vertex origin) of halfedge
-				hedges[i]->source = vertices[faceids[i]];
-
-				// set originof for vertex if not already set
 				if (vertices[faceids[i]]->originof == NULL)
-					vertices[faceids[i]]->originof = hedges[i];
+					vertices[faceids[i]]->originof = hedges_vec[i];
 
-				// search for the twins using twin_map
 				pair<int,int> rev_key = make_pair(faceids[iplusone], faceids[i]);
 				it = twin_map.find(rev_key);
 				if (it != twin_map.end())
 				{
-					hedges[i]->twin = it->second;
-					it->second->twin = hedges[i];
+					hedges_vec[i]->twin = it->second;
+					it->second->twin = hedges_vec[i];
 				}
 				else
 				{
 					pair<int,int> key = make_pair(faceids[i], faceids[iplusone]);
-					twin_map[key] = hedges[i];
+					twin_map[key] = hedges_vec[i];
 				}
 
-				// push edges to halfedges in myMesh
-				hedges[i]->index = halfedges.size();
-				halfedges.push_back(hedges[i]);
+				hedges_vec[i]->index = halfedges.size();
+				halfedges.push_back(hedges_vec[i]);
 			}
-			delete[] hedges;
-			// push faces to faces in myMesh
+
 			f->index = faces.size();
 			faces.push_back(f);
 		}
@@ -234,6 +226,51 @@ bool myMesh::triangulate(myFace *f)
 
 	if (n == 3)
 		return false;
+
+	myHalfedge *v0 = f->adjacent_halfedge;
+	myHalfedge *v1 = v0->next;
+
+	for (int i = 1; i < n - 1; i++)
+	{
+		myFace *tri = new myFace();
+
+		myHalfedge *he1 = new myHalfedge();
+		myHalfedge *he2 = new myHalfedge();
+		myHalfedge *he3 = new myHalfedge();
+
+		he1->source = v0->source;
+		he2->source = v1->source;
+		he3->source = v1->next->source;
+
+		he1->adjacent_face = tri;
+		he2->adjacent_face = tri;
+		he3->adjacent_face = tri;
+
+		he1->next = he2;
+		he2->next = he3;
+		he3->next = he1;
+
+		he1->prev = he3;
+		he2->prev = he1;
+		he3->prev = he2;
+
+		he1->index = halfedges.size();
+		halfedges.push_back(he1);
+		he2->index = halfedges.size();
+		halfedges.push_back(he2);
+		he3->index = halfedges.size();
+		halfedges.push_back(he3);
+
+		tri->adjacent_halfedge = he1;
+		tri->index = faces.size();
+		tri->computeNormal();
+		faces.push_back(tri);
+
+		v1 = v1->next;
+	}
+
+	faces.erase(find(faces.begin(), faces.end(), f));
+	delete f;
 
 	return true;
 }
