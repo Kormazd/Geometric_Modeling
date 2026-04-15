@@ -255,15 +255,27 @@ void display()
 		for (vector<myHalfedge *>::iterator it = m->halfedges.begin(); it != m->halfedges.end(); it++)
 		{
 			myHalfedge *e = (*it);
-			myVertex *v1 = (*it)->source;
-			if ((*it)->twin == NULL) continue;
-			myVertex *v2 = (*it)->twin->source;
+			if (e->twin == NULL) continue;
 
-			if ((*(e->adjacent_face->normal) * camera_forward > 0) != (*(e->twin->adjacent_face->normal) * camera_forward > 0))
+			myVertex *v1 = e->source;
+			myVertex *v2 = e->twin->source;
+
+			myPoint3D mid((v1->point->X + v2->point->X) / 2.0,
+			              (v1->point->Y + v2->point->Y) / 2.0,
+			              (v1->point->Z + v2->point->Z) / 2.0);
+
+			myVector3D view(mid.X - camera_eye.X,
+			                mid.Y - camera_eye.Y,
+			                mid.Z - camera_eye.Z);
+
+			double dot1 = *(e->adjacent_face->normal) * view;
+			double dot2 = *(e->twin->adjacent_face->normal) * view;
+
+			if (dot1 * dot2 < 0)
 			{
 				silhouette_edges.push_back(v1->index);
 				silhouette_edges.push_back(v2->index);
-			}				
+			}
 		}
 
 		GLuint silhouette_edges_buffer;
@@ -371,7 +383,7 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("../myproj/dolphin.obj")) {
+	if (m->readFile("../myproj/hand.obj")) {
 		m->computeNormals();
 		makeBuffers(m);
 	}
