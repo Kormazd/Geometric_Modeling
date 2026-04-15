@@ -65,5 +65,7 @@ node_modules/
 *.pem
 *.key
 
+.github/copilot-instructions.md
+
 # Keep this file tracked
 !.gitignore
