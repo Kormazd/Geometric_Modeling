@@ -383,7 +383,7 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("../myproj/hand.obj")) {
+	if (m->readFile("../myproj/octogon.obj")) {
 		m->computeNormals();
 		makeBuffers(m);
 	}
