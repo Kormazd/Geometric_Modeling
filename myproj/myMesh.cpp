@@ -224,20 +224,22 @@ bool myMesh::triangulate(myFace *f)
 	if (n == 3)
 		return false;
 
-	myHalfedge *v0 = f->adjacent_halfedge;
-	myHalfedge *v1 = v0->next;
+	myHalfedge *current = f->adjacent_halfedge;
 
-	for (int i = 1; i < n - 1; i++)
+	while (n > 3)
 	{
+		myHalfedge *prev = current->prev;
+		myHalfedge *next = current->next;
+
 		myFace *tri = new myFace();
 
 		myHalfedge *he1 = new myHalfedge();
 		myHalfedge *he2 = new myHalfedge();
 		myHalfedge *he3 = new myHalfedge();
 
-		he1->source = v0->source;
-		he2->source = v1->source;
-		he3->source = v1->next->source;
+		he1->source = prev->source;
+		he2->source = current->source;
+		he3->source = next->source;
 
 		he1->adjacent_face = tri;
 		he2->adjacent_face = tri;
@@ -262,8 +264,45 @@ bool myMesh::triangulate(myFace *f)
 		tri->index = faces.size();
 		faces.push_back(tri);
 
-		v1 = v1->next;
+		prev->next = next;
+		next->prev = prev;
+
+		current = next;
+		n--;
 	}
+
+	myFace *tri = new myFace();
+
+	myHalfedge *he1 = new myHalfedge();
+	myHalfedge *he2 = new myHalfedge();
+	myHalfedge *he3 = new myHalfedge();
+
+	he1->source = current->prev->source;
+	he2->source = current->source;
+	he3->source = current->next->source;
+
+	he1->adjacent_face = tri;
+	he2->adjacent_face = tri;
+	he3->adjacent_face = tri;
+
+	he1->next = he2;
+	he2->next = he3;
+	he3->next = he1;
+
+	he1->prev = he3;
+	he2->prev = he1;
+	he3->prev = he2;
+
+	he1->index = halfedges.size();
+	halfedges.push_back(he1);
+	he2->index = halfedges.size();
+	halfedges.push_back(he2);
+	he3->index = halfedges.size();
+	halfedges.push_back(he3);
+
+	tri->adjacent_halfedge = he1;
+	tri->index = faces.size();
+	faces.push_back(tri);
 
 	faces.erase(find(faces.begin(), faces.end(), f));
 	delete f;
