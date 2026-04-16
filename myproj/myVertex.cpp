@@ -21,6 +21,8 @@ void myVertex::computeNormal()
 	normal->dY = 0.0;
 	normal->dZ = 0.0;
 
+	if (originof == NULL) return;
+
 	myHalfedge *e = originof;
 	do {
 		*normal = *normal + *(e->adjacent_face->normal);

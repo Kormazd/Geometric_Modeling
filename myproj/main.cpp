@@ -383,7 +383,8 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("../myproj/octogon.obj")) {
+	if (m->readFile("../myproj/c_gear.obj")) {
+		m->triangulate();
 		m->computeNormals();
 		makeBuffers(m);
 	}
