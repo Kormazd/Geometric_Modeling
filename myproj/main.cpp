@@ -383,9 +383,14 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("../myproj/c_gear.obj")) {
+	if (m->readFile("../myproj/gear.obj")) {
 		m->triangulate();
 		m->computeNormals();
+
+		m->testTriangulation();
+		m->testNormals();
+		m->testHalfedgeConnectivity();
+
 		makeBuffers(m);
 	}
 }

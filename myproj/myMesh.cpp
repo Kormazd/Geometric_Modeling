@@ -293,3 +293,64 @@ bool myMesh::triangulate(myFace *f)
 	return true;
 }
 
+bool myMesh::testTriangulation()
+{
+	bool ok = true;
+	cout << "=== Test Triangulation ===" << endl;
+
+	for (unsigned int i = 0; i < faces.size(); i++)
+	{
+		myHalfedge *e = faces[i]->adjacent_halfedge;
+		int count = 0;
+		do { count++; e = e->next; } while (e != faces[i]->adjacent_halfedge && count <= 4);
+		if (count != 3) { cout << "  FAIL: face " << i << " a " << count << " aretes" << endl; ok = false; }
+	}
+
+	int V = vertices.size(), E = halfedges.size() / 2, F = faces.size();
+	cout << "  Euler: V=" << V << " E=" << E << " F=" << F << " => " << V - E + F << endl;
+
+	cout << (ok ? "  PASSED" : "  FAILED") << endl;
+	return ok;
+}
+
+bool myMesh::testNormals()
+{
+	bool ok = true;
+	cout << "=== Test Normals ===" << endl;
+
+	for (unsigned int i = 0; i < faces.size(); i++)
+	{
+		double len = faces[i]->normal->length();
+		if (len < 0.9 || len > 1.1) { cout << "  FAIL: face " << i << " normal len=" << len << endl; ok = false; }
+	}
+
+	for (unsigned int i = 0; i < vertices.size(); i++)
+	{
+		if (vertices[i]->originof == NULL) continue;
+		double len = vertices[i]->normal->length();
+		if (len < 0.9 || len > 1.1) { cout << "  FAIL: vertex " << i << " normal len=" << len << endl; ok = false; }
+	}
+
+	cout << (ok ? "  PASSED" : "  FAILED") << endl;
+	return ok;
+}
+
+bool myMesh::testHalfedgeConnectivity()
+{
+	bool ok = true;
+	cout << "=== Test Halfedge Connectivity ===" << endl;
+
+	for (unsigned int i = 0; i < halfedges.size(); i++)
+	{
+		myHalfedge *he = halfedges[i];
+		if (he->next == NULL || he->prev == NULL) { cout << "  FAIL: he " << i << " NULL next/prev" << endl; ok = false; continue; }
+		if (he->next->prev != he) { cout << "  FAIL: he " << i << " next->prev broken" << endl; ok = false; }
+		if (he->prev->next != he) { cout << "  FAIL: he " << i << " prev->next broken" << endl; ok = false; }
+		if (he->twin != NULL && he->twin->twin != he) { cout << "  FAIL: he " << i << " twin broken" << endl; ok = false; }
+		if (he->source == NULL || he->adjacent_face == NULL) { cout << "  FAIL: he " << i << " NULL source/face" << endl; ok = false; }
+	}
+
+	cout << (ok ? "  PASSED" : "  FAILED") << endl;
+	return ok;
+}
+
