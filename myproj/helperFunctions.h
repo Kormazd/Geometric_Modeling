@@ -585,7 +585,7 @@ void initInterface(int argc, char* argv[])
 	glutAddMenuEntry("Triangulate", MENU_TRIANGULATE);
 	glutAddMenuEntry("Write to File", MENU_WRITE);
 	glutAddMenuEntry("Undo", MENU_UNDO);
-	glutAddMenuEntry("Generate Mesh", MENU_GENERATE);
+	glutAddMenuEntry("Surface Revolution", MENU_GENERATE);
 	glutAddMenuEntry("Cut Mesh", MENU_CUT);
 	glutAddMenuEntry("Exit", MENU_EXIT);
 

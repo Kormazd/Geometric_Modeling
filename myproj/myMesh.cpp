@@ -183,6 +183,157 @@ void myMesh::normalize()
 }
 
 
+void myMesh::generateSurfaceOfRevolution(vector<myPoint3D> &profile, int nSlices)
+{
+	clear();
+
+	int nPts = profile.size();
+	myVector3D axis(0, 1, 0);
+	double angleStep = 2.0 * 3.14159265358979 / nSlices;
+
+	for (int j = 0; j < nSlices; j++)
+	{
+		double angle = j * angleStep;
+		for (int i = 0; i < nPts; i++)
+		{
+			myPoint3D p = profile[i];
+			p.rotate(axis, angle);
+			myVertex *v = new myVertex();
+			v->point = new myPoint3D(p.X, p.Y, p.Z);
+			v->index = vertices.size();
+			vertices.push_back(v);
+		}
+	}
+
+	map<pair<int, int>, myHalfedge *> twin_map;
+
+	for (int j = 0; j < nSlices; j++)
+	{
+		int jnext = (j + 1) % nSlices;
+		for (int i = 0; i < nPts - 1; i++)
+		{
+			int v0 = j * nPts + i;
+			int v1 = j * nPts + i + 1;
+			int v2 = jnext * nPts + i + 1;
+			int v3 = jnext * nPts + i;
+
+			int faceids[] = { v0, v1, v2, v3 };
+
+			myHalfedge *he[4];
+			for (int k = 0; k < 4; k++) he[k] = new myHalfedge();
+
+			myFace *f = new myFace();
+			f->adjacent_halfedge = he[0];
+
+			for (int k = 0; k < 4; k++)
+			{
+				he[k]->next = he[(k + 1) % 4];
+				he[k]->prev = he[(k + 3) % 4];
+				he[k]->adjacent_face = f;
+				he[k]->source = vertices[faceids[k]];
+
+				if (vertices[faceids[k]]->originof == NULL)
+					vertices[faceids[k]]->originof = he[k];
+
+				int a = faceids[k], b = faceids[(k + 1) % 4];
+				pair<int, int> rev = make_pair(b, a);
+				map<pair<int, int>, myHalfedge *>::iterator it = twin_map.find(rev);
+				if (it != twin_map.end())
+				{
+					he[k]->twin = it->second;
+					it->second->twin = he[k];
+				}
+				else
+					twin_map[make_pair(a, b)] = he[k];
+
+				he[k]->index = halfedges.size();
+				halfedges.push_back(he[k]);
+			}
+
+			f->index = faces.size();
+			faces.push_back(f);
+		}
+	}
+
+	myVertex *vTop = new myVertex();
+	vTop->point = new myPoint3D(0, profile[nPts - 1].Y, 0);
+	vTop->index = vertices.size();
+	vertices.push_back(vTop);
+
+	myVertex *vBot = new myVertex();
+	vBot->point = new myPoint3D(0, profile[0].Y, 0);
+	vBot->index = vertices.size();
+	vertices.push_back(vBot);
+
+	int topIdx = vTop->index;
+	int botIdx = vBot->index;
+
+	for (int j = 0; j < nSlices; j++)
+	{
+		int jnext = (j + 1) % nSlices;
+		int a = j * nPts + (nPts - 1);
+		int b = jnext * nPts + (nPts - 1);
+
+		int fids[] = { a, b, topIdx };
+		myHalfedge *he[3];
+		for (int k = 0; k < 3; k++) he[k] = new myHalfedge();
+		myFace *f = new myFace();
+		f->adjacent_halfedge = he[0];
+		for (int k = 0; k < 3; k++)
+		{
+			he[k]->next = he[(k + 1) % 3];
+			he[k]->prev = he[(k + 2) % 3];
+			he[k]->adjacent_face = f;
+			he[k]->source = vertices[fids[k]];
+			if (vertices[fids[k]]->originof == NULL)
+				vertices[fids[k]]->originof = he[k];
+			int aa = fids[k], bb = fids[(k + 1) % 3];
+			pair<int, int> rev = make_pair(bb, aa);
+			map<pair<int, int>, myHalfedge *>::iterator it = twin_map.find(rev);
+			if (it != twin_map.end()) { he[k]->twin = it->second; it->second->twin = he[k]; }
+			else twin_map[make_pair(aa, bb)] = he[k];
+			he[k]->index = halfedges.size();
+			halfedges.push_back(he[k]);
+		}
+		f->index = faces.size();
+		faces.push_back(f);
+	}
+
+	for (int j = 0; j < nSlices; j++)
+	{
+		int jnext = (j + 1) % nSlices;
+		int a = jnext * nPts;
+		int b = j * nPts;
+
+		int fids[] = { a, b, botIdx };
+		myHalfedge *he[3];
+		for (int k = 0; k < 3; k++) he[k] = new myHalfedge();
+		myFace *f = new myFace();
+		f->adjacent_halfedge = he[0];
+		for (int k = 0; k < 3; k++)
+		{
+			he[k]->next = he[(k + 1) % 3];
+			he[k]->prev = he[(k + 2) % 3];
+			he[k]->adjacent_face = f;
+			he[k]->source = vertices[fids[k]];
+			if (vertices[fids[k]]->originof == NULL)
+				vertices[fids[k]]->originof = he[k];
+			int aa = fids[k], bb = fids[(k + 1) % 3];
+			pair<int, int> rev = make_pair(bb, aa);
+			map<pair<int, int>, myHalfedge *>::iterator it = twin_map.find(rev);
+			if (it != twin_map.end()) { he[k]->twin = it->second; it->second->twin = he[k]; }
+			else twin_map[make_pair(aa, bb)] = he[k];
+			he[k]->index = halfedges.size();
+			halfedges.push_back(he[k]);
+		}
+		f->index = faces.size();
+		faces.push_back(f);
+	}
+
+	checkMesh();
+	normalize();
+}
+
 void myMesh::splitFaceTRIS(myFace *f, myPoint3D *p)
 {
 	/**** TODO ****/

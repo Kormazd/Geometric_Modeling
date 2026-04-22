@@ -28,6 +28,8 @@ public:
 	void triangulate();
 	bool triangulate(myFace *);
 
+	void generateSurfaceOfRevolution(std::vector<myPoint3D> &profile, int nSlices);
+
 	void clear();
 
 	bool testTriangulation();
