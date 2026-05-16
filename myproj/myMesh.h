@@ -27,7 +27,6 @@ public:
 
 	void triangulate();
 	bool triangulate(myFace *);
-
 	void generateSurfaceOfRevolution(std::vector<myPoint3D> &profile, int nSlices);
 
 	void clear();
@@ -35,6 +34,8 @@ public:
 	bool testTriangulation();
 	bool testNormals();
 	bool testHalfedgeConnectivity();
+	void simplifyShortestEdgeCollapse(int n = 1);
+	bool simplifyShortestEdgeCollapse(myHalfedge *, myPoint3D);
 
 	myMesh(void);
 	~myMesh(void);

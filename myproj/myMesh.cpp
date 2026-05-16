@@ -3,7 +3,10 @@
 #include <iostream>
 #include <sstream>
 #include <map>
+#include <set>
 #include <utility>
+#include <limits>
+#include <algorithm>
 #include <GL/glew.h>
 #include "myvector3d.h"
 
@@ -182,22 +185,22 @@ void myMesh::normalize()
 	}
 }
 
-
 void myMesh::generateSurfaceOfRevolution(vector<myPoint3D> &profile, int nSlices)
 {
 	clear();
+	if (profile.size() < 2 || nSlices < 3) return;
 
-	int nPts = profile.size();
+	int nPts = (int)profile.size();
 	myVector3D axis(0, 1, 0);
-	double angleStep = 2.0 * 3.14159265358979 / nSlices;
+	double step = 2.0 * 3.14159265358979 / nSlices;
 
 	for (int j = 0; j < nSlices; j++)
 	{
-		double angle = j * angleStep;
+		double a = j * step;
 		for (int i = 0; i < nPts; i++)
 		{
 			myPoint3D p = profile[i];
-			p.rotate(axis, angle);
+			p.rotate(axis, a);
 			myVertex *v = new myVertex();
 			v->point = new myPoint3D(p.X, p.Y, p.Z);
 			v->index = vertices.size();
@@ -209,45 +212,31 @@ void myMesh::generateSurfaceOfRevolution(vector<myPoint3D> &profile, int nSlices
 
 	for (int j = 0; j < nSlices; j++)
 	{
-		int jnext = (j + 1) % nSlices;
+		int j2 = (j + 1) % nSlices;
 		for (int i = 0; i < nPts - 1; i++)
 		{
-			int v0 = j * nPts + i;
-			int v1 = j * nPts + i + 1;
-			int v2 = jnext * nPts + i + 1;
-			int v3 = jnext * nPts + i;
-
-			int faceids[] = { v0, v1, v2, v3 };
-
-			myHalfedge *he[4];
-			for (int k = 0; k < 4; k++) he[k] = new myHalfedge();
-
+			int ids[4] = { j * nPts + i, j * nPts + i + 1, j2 * nPts + i + 1, j2 * nPts + i };
+			myHalfedge *h[4];
+			for (int k = 0; k < 4; k++) h[k] = new myHalfedge();
 			myFace *f = new myFace();
-			f->adjacent_halfedge = he[0];
+			f->adjacent_halfedge = h[0];
 
 			for (int k = 0; k < 4; k++)
 			{
-				he[k]->next = he[(k + 1) % 4];
-				he[k]->prev = he[(k + 3) % 4];
-				he[k]->adjacent_face = f;
-				he[k]->source = vertices[faceids[k]];
+				int kn = (k + 1) % 4, kp = (k + 3) % 4;
+				h[k]->next = h[kn];
+				h[k]->prev = h[kp];
+				h[k]->adjacent_face = f;
+				h[k]->source = vertices[ids[k]];
+				if (vertices[ids[k]]->originof == NULL) vertices[ids[k]]->originof = h[k];
 
-				if (vertices[faceids[k]]->originof == NULL)
-					vertices[faceids[k]]->originof = he[k];
-
-				int a = faceids[k], b = faceids[(k + 1) % 4];
-				pair<int, int> rev = make_pair(b, a);
+				pair<int, int> rev = make_pair(ids[kn], ids[k]);
 				map<pair<int, int>, myHalfedge *>::iterator it = twin_map.find(rev);
-				if (it != twin_map.end())
-				{
-					he[k]->twin = it->second;
-					it->second->twin = he[k];
-				}
-				else
-					twin_map[make_pair(a, b)] = he[k];
+				if (it != twin_map.end()) { h[k]->twin = it->second; it->second->twin = h[k]; }
+				else twin_map[make_pair(ids[k], ids[kn])] = h[k];
 
-				he[k]->index = halfedges.size();
-				halfedges.push_back(he[k]);
+				h[k]->index = halfedges.size();
+				halfedges.push_back(h[k]);
 			}
 
 			f->index = faces.size();
@@ -265,35 +254,29 @@ void myMesh::generateSurfaceOfRevolution(vector<myPoint3D> &profile, int nSlices
 	vBot->index = vertices.size();
 	vertices.push_back(vBot);
 
-	int topIdx = vTop->index;
-	int botIdx = vBot->index;
-
+	int topIdx = vTop->index, botIdx = vBot->index;
 	for (int j = 0; j < nSlices; j++)
 	{
-		int jnext = (j + 1) % nSlices;
-		int a = j * nPts + (nPts - 1);
-		int b = jnext * nPts + (nPts - 1);
-
-		int fids[] = { a, b, topIdx };
-		myHalfedge *he[3];
-		for (int k = 0; k < 3; k++) he[k] = new myHalfedge();
+		int j2 = (j + 1) % nSlices;
+		int ids[3] = { j * nPts + (nPts - 1), j2 * nPts + (nPts - 1), topIdx };
+		myHalfedge *h[3];
+		for (int k = 0; k < 3; k++) h[k] = new myHalfedge();
 		myFace *f = new myFace();
-		f->adjacent_halfedge = he[0];
+		f->adjacent_halfedge = h[0];
 		for (int k = 0; k < 3; k++)
 		{
-			he[k]->next = he[(k + 1) % 3];
-			he[k]->prev = he[(k + 2) % 3];
-			he[k]->adjacent_face = f;
-			he[k]->source = vertices[fids[k]];
-			if (vertices[fids[k]]->originof == NULL)
-				vertices[fids[k]]->originof = he[k];
-			int aa = fids[k], bb = fids[(k + 1) % 3];
-			pair<int, int> rev = make_pair(bb, aa);
+			int kn = (k + 1) % 3, kp = (k + 2) % 3;
+			h[k]->next = h[kn];
+			h[k]->prev = h[kp];
+			h[k]->adjacent_face = f;
+			h[k]->source = vertices[ids[k]];
+			if (vertices[ids[k]]->originof == NULL) vertices[ids[k]]->originof = h[k];
+			pair<int, int> rev = make_pair(ids[kn], ids[k]);
 			map<pair<int, int>, myHalfedge *>::iterator it = twin_map.find(rev);
-			if (it != twin_map.end()) { he[k]->twin = it->second; it->second->twin = he[k]; }
-			else twin_map[make_pair(aa, bb)] = he[k];
-			he[k]->index = halfedges.size();
-			halfedges.push_back(he[k]);
+			if (it != twin_map.end()) { h[k]->twin = it->second; it->second->twin = h[k]; }
+			else twin_map[make_pair(ids[k], ids[kn])] = h[k];
+			h[k]->index = halfedges.size();
+			halfedges.push_back(h[k]);
 		}
 		f->index = faces.size();
 		faces.push_back(f);
@@ -301,30 +284,26 @@ void myMesh::generateSurfaceOfRevolution(vector<myPoint3D> &profile, int nSlices
 
 	for (int j = 0; j < nSlices; j++)
 	{
-		int jnext = (j + 1) % nSlices;
-		int a = jnext * nPts;
-		int b = j * nPts;
-
-		int fids[] = { a, b, botIdx };
-		myHalfedge *he[3];
-		for (int k = 0; k < 3; k++) he[k] = new myHalfedge();
+		int j2 = (j + 1) % nSlices;
+		int ids[3] = { j2 * nPts, j * nPts, botIdx };
+		myHalfedge *h[3];
+		for (int k = 0; k < 3; k++) h[k] = new myHalfedge();
 		myFace *f = new myFace();
-		f->adjacent_halfedge = he[0];
+		f->adjacent_halfedge = h[0];
 		for (int k = 0; k < 3; k++)
 		{
-			he[k]->next = he[(k + 1) % 3];
-			he[k]->prev = he[(k + 2) % 3];
-			he[k]->adjacent_face = f;
-			he[k]->source = vertices[fids[k]];
-			if (vertices[fids[k]]->originof == NULL)
-				vertices[fids[k]]->originof = he[k];
-			int aa = fids[k], bb = fids[(k + 1) % 3];
-			pair<int, int> rev = make_pair(bb, aa);
+			int kn = (k + 1) % 3, kp = (k + 2) % 3;
+			h[k]->next = h[kn];
+			h[k]->prev = h[kp];
+			h[k]->adjacent_face = f;
+			h[k]->source = vertices[ids[k]];
+			if (vertices[ids[k]]->originof == NULL) vertices[ids[k]]->originof = h[k];
+			pair<int, int> rev = make_pair(ids[kn], ids[k]);
 			map<pair<int, int>, myHalfedge *>::iterator it = twin_map.find(rev);
-			if (it != twin_map.end()) { he[k]->twin = it->second; it->second->twin = he[k]; }
-			else twin_map[make_pair(aa, bb)] = he[k];
-			he[k]->index = halfedges.size();
-			halfedges.push_back(he[k]);
+			if (it != twin_map.end()) { h[k]->twin = it->second; it->second->twin = h[k]; }
+			else twin_map[make_pair(ids[k], ids[kn])] = h[k];
+			h[k]->index = halfedges.size();
+			halfedges.push_back(h[k]);
 		}
 		f->index = faces.size();
 		faces.push_back(f);
@@ -333,6 +312,7 @@ void myMesh::generateSurfaceOfRevolution(vector<myPoint3D> &profile, int nSlices
 	checkMesh();
 	normalize();
 }
+
 
 void myMesh::splitFaceTRIS(myFace *f, myPoint3D *p)
 {
@@ -503,5 +483,147 @@ bool myMesh::testHalfedgeConnectivity()
 
 	cout << (ok ? "  PASSED" : "  FAILED") << endl;
 	return ok;
+}
+
+void myMesh::simplifyShortestEdgeCollapse(int n)
+{
+	for (int step = 0; step < n; step++)
+	{
+		if (halfedges.empty()) return;
+
+		// Construire la liste des arêtes intérieures triées par longueur croissante
+		// On évite les doublons (chaque arête = 1 halfedge sur 2) via un set
+		map<myVertex*, int> vMap;
+		for (unsigned int i = 0; i < vertices.size(); i++) vMap[vertices[i]] = i;
+
+		vector<pair<double, myHalfedge*>> sortedEdges;
+		set<pair<int,int>> seen;
+		for (unsigned int i = 0; i < halfedges.size(); i++)
+		{
+			myHalfedge *e = halfedges[i];
+			if (e->twin == NULL) continue; // ignorer les arêtes de bord
+			int a = vMap[e->source], b = vMap[e->twin->source];
+			if (a > b) std::swap(a, b); // clé canonique pour éviter les doublons
+			if (seen.count(make_pair(a, b))) continue;
+			seen.insert(make_pair(a, b));
+
+			double dx = e->source->point->X - e->twin->source->point->X;
+			double dy = e->source->point->Y - e->twin->source->point->Y;
+			double dz = e->source->point->Z - e->twin->source->point->Z;
+			sortedEdges.push_back(make_pair(sqrt(dx*dx + dy*dy + dz*dz), e));
+		}
+		sort(sortedEdges.begin(), sortedEdges.end());
+
+		// Essayer les arêtes de la plus courte à la plus longue
+		// Si la plus courte échoue (link condition), on essaie la suivante
+		bool collapsed = false;
+		for (unsigned int i = 0; i < sortedEdges.size(); i++)
+		{
+			myHalfedge *e = sortedEdges[i].second;
+			// Règle 2 du cours : nouveau sommet = milieu des deux extrémités
+			myPoint3D midpoint(
+				(e->source->point->X + e->twin->source->point->X) * 0.5,
+				(e->source->point->Y + e->twin->source->point->Y) * 0.5,
+				(e->source->point->Z + e->twin->source->point->Z) * 0.5
+			);
+			if (simplifyShortestEdgeCollapse(e, midpoint))
+			{
+				collapsed = true;
+				break; // collapse réussi, passer à l'étape suivante
+			}
+			// sinon : link condition refusée pour cette arête, on essaie la suivante
+		}
+
+		if (!collapsed) break; // aucune arête du maillage ne peut être collapsée
+	}
+	normalize();
+	computeNormals();
+}
+
+bool myMesh::simplifyShortestEdgeCollapse(myHalfedge *best, myPoint3D pNew)
+{
+	map<myVertex*, int> vMap;
+	for (unsigned int i = 0; i < vertices.size(); i++) vMap[vertices[i]] = i;
+
+	int iKeep = vMap[best->source];
+	int iKill = vMap[best->twin->source];
+
+	// Build 1-ring neighbor sets for link condition check
+	set<int> neighKeep, neighKill;
+	for (unsigned int i = 0; i < halfedges.size(); i++)
+	{
+		int src = vMap[halfedges[i]->source];
+		int dst = vMap[halfedges[i]->next->source];
+		if (src == iKeep && dst != iKill) neighKeep.insert(dst);
+		if (dst == iKeep && src != iKill) neighKeep.insert(src);
+		if (src == iKill && dst != iKeep) neighKill.insert(dst);
+		if (dst == iKill && src != iKeep) neighKill.insert(src);
+	}
+	vector<int> common;
+	for (int v : neighKeep) if (neighKill.count(v)) common.push_back(v);
+	if (common.size() != 2) return false;
+
+	vector<vector<int>> newFaces;
+	set<set<int>> seenFaces;
+	for (unsigned int i = 0; i < faces.size(); i++)
+	{
+		vector<int> ids;
+		myHalfedge *e = faces[i]->adjacent_halfedge;
+		do { int idx = vMap[e->source]; if (idx == iKill) idx = iKeep; ids.push_back(idx); e = e->next; } while (e != faces[i]->adjacent_halfedge);
+		set<int> u(ids.begin(), ids.end());
+		if ((int)u.size() < 3) continue;
+		if (seenFaces.count(u)) continue;
+		seenFaces.insert(u);
+		newFaces.push_back(ids);
+	}
+
+	map<int, int> remap;
+	vector<myPoint3D> newPts;
+	for (unsigned int i = 0; i < vertices.size(); i++)
+	{
+		if ((int)i == iKill) continue;
+		remap[i] = (int)newPts.size();
+		newPts.push_back((int)i == iKeep ? pNew : *(vertices[i]->point));
+	}
+	for (unsigned int i = 0; i < newFaces.size(); i++)
+		for (unsigned int j = 0; j < newFaces[i].size(); j++)
+			newFaces[i][j] = remap[newFaces[i][j]];
+
+	clear();
+	for (unsigned int i = 0; i < newPts.size(); i++)
+	{
+		myVertex *v = new myVertex();
+		v->point = new myPoint3D(newPts[i].X, newPts[i].Y, newPts[i].Z);
+		v->index = (int)vertices.size();
+		vertices.push_back(v);
+	}
+
+	map<pair<int, int>, myHalfedge *> twin_map;
+	for (unsigned int i = 0; i < newFaces.size(); i++)
+	{
+		int n = (int)newFaces[i].size();
+		vector<myHalfedge *> h(n);
+		for (int k = 0; k < n; k++) h[k] = new myHalfedge();
+		myFace *f = new myFace();
+		f->adjacent_halfedge = h[0];
+		for (int k = 0; k < n; k++)
+		{
+			int kn = (k + 1) % n, kp = (k + n - 1) % n;
+			h[k]->next = h[kn]; h[k]->prev = h[kp];
+			h[k]->adjacent_face = f;
+			h[k]->source = vertices[newFaces[i][k]];
+			if (vertices[newFaces[i][k]]->originof == NULL) vertices[newFaces[i][k]]->originof = h[k];
+			pair<int, int> rev = make_pair(newFaces[i][kn], newFaces[i][k]);
+			map<pair<int, int>, myHalfedge *>::iterator it = twin_map.find(rev);
+			if (it != twin_map.end()) { h[k]->twin = it->second; it->second->twin = h[k]; }
+			else twin_map[make_pair(newFaces[i][k], newFaces[i][kn])] = h[k];
+			h[k]->index = (int)halfedges.size();
+			halfedges.push_back(h[k]);
+		}
+		f->index = (int)faces.size();
+		faces.push_back(f);
+	}
+
+	return true;
 }
 

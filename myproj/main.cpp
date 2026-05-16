@@ -47,7 +47,6 @@ void menu(int item)
 		{
 			m->triangulate();
 			m->computeNormals();
-			drawwireframe = true;
 			makeBuffers(m);
 			break;
 		}
@@ -167,6 +166,12 @@ void menu(int item)
 			profile.push_back(myPoint3D(0.5, 1.0, 0.0));
 			m->generateSurfaceOfRevolution(profile, 20);
 			m->computeNormals();
+			makeBuffers(m);
+			break;
+		}
+	case MENU_SIMPLIFY:
+		{
+			m->simplifyShortestEdgeCollapse((int)m->vertices.size() / 2);
 			makeBuffers(m);
 			break;
 		}
@@ -395,7 +400,7 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("../myproj/gear.obj")) {
+	if (m->readFile("../myproj/dolphin.obj")) {
 		m->triangulate();
 		m->computeNormals();
 
