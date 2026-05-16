@@ -333,7 +333,261 @@ void myMesh::splitFaceQUADS(myFace *f, myPoint3D *p)
 
 void myMesh::subdivisionCatmullClark()
 {
-	/**** TODO ****/
+	// =====================================================================
+	// APPROCHE : on crée un nouveau maillage vide, on le remplit étape par
+	// étape, puis on remplace l'ancien maillage par le nouveau.
+	// On utilise des std::map pour retrouver rapidement quel nouveau sommet
+	// correspond à quelle ancienne face / ancienne arête / ancien sommet.
+	// =====================================================================
+
+	// Les nouveaux sommets seront stockés dans ces vecteurs temporaires.
+	// On les indexe à partir de 0 dans le nouveau maillage.
+	vector<myPoint3D> newPoints;   // toutes les positions des nouveaux sommets
+	vector<vector<int>> newFaces;  // chaque face = liste d'indices dans newPoints
+
+	// -----------------------------------------------------------------------
+	// ETAPE 1 : FACE POINTS
+	// Pour chaque ancienne face, on calcule la moyenne de ses sommets.
+	// Ce point représente le "centre" de la face dans le nouveau maillage.
+	// -----------------------------------------------------------------------
+	// On stocke l'indice du face point de chaque face dans cette map.
+	map<myFace*, int> facePointIndex;
+
+	for (unsigned int i = 0; i < faces.size(); i++)
+	{
+		myFace *f = faces[i];
+		myHalfedge *he = f->adjacent_halfedge;
+
+		// Parcourir tous les sommets de la face et sommer leurs positions
+		myPoint3D sum(0.0, 0.0, 0.0);
+		int count = 0;
+		do {
+			sum.X += he->source->point->X;
+			sum.Y += he->source->point->Y;
+			sum.Z += he->source->point->Z;
+			count++;
+			he = he->next;
+		} while (he != f->adjacent_halfedge);
+
+		// Le face point = moyenne des sommets de la face
+		myPoint3D fp(sum.X / count, sum.Y / count, sum.Z / count);
+
+		// On enregistre l'indice de ce nouveau sommet
+		facePointIndex[f] = (int)newPoints.size();
+		newPoints.push_back(fp);
+	}
+
+	// -----------------------------------------------------------------------
+	// ETAPE 2 : EDGE POINTS
+	// Pour chaque arête physique (paire de half-edges jumeaux), on calcule :
+	//   e = (v1 + v2 + f1 + f2) / 4
+	// où v1, v2 sont les deux extrémités et f1, f2 sont les face points des
+	// deux faces adjacentes à cette arête.
+	// -----------------------------------------------------------------------
+	// On stocke l'indice du edge point pour chaque half-edge (et son twin).
+	// Pour éviter de traiter chaque arête deux fois, on utilise un set.
+	map<myHalfedge*, int> edgePointIndex;
+	set<myHalfedge*> visitedEdges;
+
+	for (unsigned int i = 0; i < halfedges.size(); i++)
+	{
+		myHalfedge *he = halfedges[i];
+
+		// Si on a déjà traité cette arête (via son twin), on passe
+		if (visitedEdges.count(he)) continue;
+		if (he->twin == NULL) continue; // arête de bord : on ignore pour l'instant
+
+		// Marquer les deux demi-arêtes comme traitées
+		visitedEdges.insert(he);
+		visitedEdges.insert(he->twin);
+
+		// Récupérer les deux extrémités de l'arête
+		myPoint3D *v1 = he->source->point;
+		myPoint3D *v2 = he->twin->source->point;
+
+		// Récupérer les face points des deux faces adjacentes (étape 1)
+		myPoint3D f1 = newPoints[facePointIndex[he->adjacent_face]];
+		myPoint3D f2 = newPoints[facePointIndex[he->twin->adjacent_face]];
+
+		// Formule du cours : e = (v1 + v2 + f1 + f2) / 4
+		myPoint3D ep(
+			(v1->X + v2->X + f1.X + f2.X) / 4.0,
+			(v1->Y + v2->Y + f1.Y + f2.Y) / 4.0,
+			(v1->Z + v2->Z + f1.Z + f2.Z) / 4.0
+		);
+
+		// Les deux demi-arêtes partagent le même edge point
+		int idx = (int)newPoints.size();
+		edgePointIndex[he]       = idx;
+		edgePointIndex[he->twin] = idx;
+		newPoints.push_back(ep);
+	}
+
+	// -----------------------------------------------------------------------
+	// ETAPE 3 : VERTEX POINTS
+	// Pour chaque ancien sommet p de valence n, on calcule sa nouvelle position
+	// lissée avec la formule du cours :
+	//   v = (F_avg + 2 * M_avg + (n-3) * p) / n
+	// où :
+	//   F_avg = moyenne des face points des faces adjacentes au sommet
+	//   M_avg = moyenne des milieux des anciennes arêtes issues du sommet
+	//   n     = valence (nombre d'arêtes issues du sommet)
+	// -----------------------------------------------------------------------
+	map<myVertex*, int> vertexPointIndex;
+
+	for (unsigned int i = 0; i < vertices.size(); i++)
+	{
+		myVertex *v = vertices[i];
+		if (v->originof == NULL) continue; // sommet isolé : on ignore
+
+		// Parcourir le 1-ring du sommet via les half-edges sortants
+		// (on tourne autour du sommet en suivant : he -> he->twin->next)
+		myPoint3D F_avg(0.0, 0.0, 0.0); // somme des face points adjacents
+		myPoint3D M_avg(0.0, 0.0, 0.0); // somme des milieux des arêtes adjacentes
+		int n = 0;                        // valence
+
+		myHalfedge *start = v->originof;
+		myHalfedge *he    = start;
+		do {
+			// Face point de la face adjacente à ce half-edge
+			myPoint3D fp = newPoints[facePointIndex[he->adjacent_face]];
+			F_avg.X += fp.X;
+			F_avg.Y += fp.Y;
+			F_avg.Z += fp.Z;
+
+			// Milieu de l'arête (v + voisin) / 2
+			myPoint3D *neighbor = he->next->source->point;
+			M_avg.X += (v->point->X + neighbor->X) / 2.0;
+			M_avg.Y += (v->point->Y + neighbor->Y) / 2.0;
+			M_avg.Z += (v->point->Z + neighbor->Z) / 2.0;
+
+			n++;
+			// Passer à l'arête suivante autour du sommet
+			if (he->twin == NULL) break; // bord : on arrête
+			he = he->twin->next;
+		} while (he != start);
+
+		if (n == 0) continue;
+
+		// Terminer le calcul des moyennes
+		F_avg.X /= n; F_avg.Y /= n; F_avg.Z /= n;
+		M_avg.X /= n; M_avg.Y /= n; M_avg.Z /= n;
+
+		// Formule du cours : v = (F_avg + 2*M_avg + (n-3)*p) / n
+		myPoint3D *p = v->point;
+		myPoint3D vp(
+			(F_avg.X + 2.0 * M_avg.X + (n - 3) * p->X) / n,
+			(F_avg.Y + 2.0 * M_avg.Y + (n - 3) * p->Y) / n,
+			(F_avg.Z + 2.0 * M_avg.Z + (n - 3) * p->Z) / n
+		);
+
+		vertexPointIndex[v] = (int)newPoints.size();
+		newPoints.push_back(vp);
+	}
+
+	// -----------------------------------------------------------------------
+	// ETAPE 4 : CREATION DES QUADRILATERES
+	// Pour chaque ancienne face, et pour chaque coin (sommet) de cette face,
+	// on crée un quad qui relie dans l'ordre :
+	//   [vertex point] -> [edge point de l'arête courante]
+	//   -> [face point] -> [edge point de l'arête précédente]
+	//
+	//       v_point --- e_point_prev
+	//          |              |
+	//       e_point  --- f_point
+	// -----------------------------------------------------------------------
+	for (unsigned int i = 0; i < faces.size(); i++)
+	{
+		myFace *f = faces[i];
+		int fp_idx = facePointIndex[f]; // face point de cette face
+
+		// Collecter les half-edges de la face dans l'ordre
+		vector<myHalfedge*> faceHE;
+		myHalfedge *he = f->adjacent_halfedge;
+		do {
+			faceHE.push_back(he);
+			he = he->next;
+		} while (he != f->adjacent_halfedge);
+
+		int n = (int)faceHE.size();
+		for (int k = 0; k < n; k++)
+		{
+			myHalfedge *heCur  = faceHE[k];
+			myHalfedge *hePrev = faceHE[(k + n - 1) % n];
+
+			int vp_idx   = vertexPointIndex[heCur->source]; // vertex point du coin
+			int ep_cur   = edgePointIndex[heCur];           // edge point arête courante
+			int ep_prev  = edgePointIndex[hePrev];          // edge point arête précédente
+
+			// Le quad dans le sens trigonométrique :
+			// vertex_point -> edge_point_courant -> face_point -> edge_point_précédent
+			vector<int> quad = { vp_idx, ep_cur, fp_idx, ep_prev };
+			newFaces.push_back(quad);
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// RECONSTRUCTION : remplacer l'ancien maillage par le nouveau
+	// On utilise le même pattern twin_map que dans readFile.
+	// -----------------------------------------------------------------------
+	clear();
+
+	// Créer les nouveaux sommets
+	for (unsigned int i = 0; i < newPoints.size(); i++)
+	{
+		myVertex *v    = new myVertex();
+		v->point       = new myPoint3D(newPoints[i].X, newPoints[i].Y, newPoints[i].Z);
+		v->index       = (int)vertices.size();
+		vertices.push_back(v);
+	}
+
+	// Créer les half-edges et les faces avec le pattern twin_map
+	map<pair<int,int>, myHalfedge*> twin_map;
+	for (unsigned int i = 0; i < newFaces.size(); i++)
+	{
+		int sz = (int)newFaces[i].size();
+		vector<myHalfedge*> h(sz);
+		for (int k = 0; k < sz; k++) h[k] = new myHalfedge();
+
+		myFace *f = new myFace();
+		f->adjacent_halfedge = h[0];
+
+		for (int k = 0; k < sz; k++)
+		{
+			int kn = (k + 1) % sz;
+			int kp = (k + sz - 1) % sz;
+
+			h[k]->next         = h[kn];
+			h[k]->prev         = h[kp];
+			h[k]->adjacent_face = f;
+			h[k]->source       = vertices[newFaces[i][k]];
+
+			if (vertices[newFaces[i][k]]->originof == NULL)
+				vertices[newFaces[i][k]]->originof = h[k];
+
+			// Chercher le twin : l'arête inverse (kn -> k) doit déjà être dans la map
+			pair<int,int> rev = make_pair(newFaces[i][kn], newFaces[i][k]);
+			map<pair<int,int>, myHalfedge*>::iterator it = twin_map.find(rev);
+			if (it != twin_map.end())
+			{
+				h[k]->twin      = it->second;
+				it->second->twin = h[k];
+			}
+			else
+			{
+				twin_map[make_pair(newFaces[i][k], newFaces[i][kn])] = h[k];
+			}
+
+			h[k]->index = (int)halfedges.size();
+			halfedges.push_back(h[k]);
+		}
+
+		f->index = (int)faces.size();
+		faces.push_back(f);
+	}
+
+	normalize();
+	computeNormals();
 }
 
 
